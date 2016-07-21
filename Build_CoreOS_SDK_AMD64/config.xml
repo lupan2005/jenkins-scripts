@@ -1,0 +1,132 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<project>
+  <actions/>
+  <description>This project uses cork to build CoreOS SDK for amd64.   When success built, it copies the new builts in src/build/images/amd64-usr directory to $JENKINS_HOME/coreos_images/amd64-usr.&#xd;
+This project is depended on project Build_CoreOS_Mantle.  So build Build_CoreOS_Mantle before build this project.</description>
+  <keepDependencies>false</keepDependencies>
+  <properties>
+    <jenkins.model.BuildDiscarderProperty>
+      <strategy class="hudson.tasks.LogRotator">
+        <daysToKeep>-1</daysToKeep>
+        <numToKeep>5</numToKeep>
+        <artifactDaysToKeep>-1</artifactDaysToKeep>
+        <artifactNumToKeep>-1</artifactNumToKeep>
+      </strategy>
+    </jenkins.model.BuildDiscarderProperty>
+    <com.coravy.hudson.plugins.github.GithubProjectProperty plugin="github@1.19.2">
+      <projectUrl>https://github.com/coreos/manifest.git/</projectUrl>
+      <displayName>CoreOS SDK</displayName>
+    </com.coravy.hudson.plugins.github.GithubProjectProperty>
+    <com.sonyericsson.rebuild.RebuildSettings plugin="rebuild@1.25">
+      <autoRebuild>false</autoRebuild>
+      <rebuildDisabled>false</rebuildDisabled>
+    </com.sonyericsson.rebuild.RebuildSettings>
+    <com.synopsys.arc.jenkinsci.plugins.jobrestrictions.jobs.JobRestrictionProperty plugin="job-restrictions@0.4"/>
+    <hudson.model.ParametersDefinitionProperty>
+      <parameterDefinitions>
+        <org.jvnet.jenkins.plugins.nodelabelparameter.NodeParameterDefinition plugin="nodelabelparameter@1.7.2">
+          <name>CoreOS SDK built for amd64</name>
+          <description></description>
+          <allowedSlaves>
+            <string>ALL (no restriction)</string>
+          </allowedSlaves>
+          <defaultSlaves>
+            <string>master</string>
+          </defaultSlaves>
+          <triggerIfResult>success</triggerIfResult>
+          <allowMultiNodeSelection>true</allowMultiNodeSelection>
+          <triggerConcurrentBuilds>false</triggerConcurrentBuilds>
+          <ignoreOfflineNodes>false</ignoreOfflineNodes>
+          <nodeEligibility class="org.jvnet.jenkins.plugins.nodelabelparameter.node.AllNodeEligibility"/>
+        </org.jvnet.jenkins.plugins.nodelabelparameter.NodeParameterDefinition>
+        <hudson.model.StringParameterDefinition>
+          <name>COREOS_SDK_VERSION</name>
+          <description></description>
+          <defaultValue>master</defaultValue>
+        </hudson.model.StringParameterDefinition>
+        <hudson.model.StringParameterDefinition>
+          <name>SDK_SCRIPT_PATH</name>
+          <description></description>
+          <defaultValue>/mnt/host/source/src/scripts</defaultValue>
+        </hudson.model.StringParameterDefinition>
+      </parameterDefinitions>
+    </hudson.model.ParametersDefinitionProperty>
+  </properties>
+  <scm class="hudson.scm.NullSCM"/>
+  <canRoam>true</canRoam>
+  <disabled>false</disabled>
+  <blockBuildWhenDownstreamBuilding>false</blockBuildWhenDownstreamBuilding>
+  <blockBuildWhenUpstreamBuilding>false</blockBuildWhenUpstreamBuilding>
+  <triggers>
+    <jenkins.triggers.ReverseBuildTrigger>
+      <spec></spec>
+      <upstreamProjects>Build_CoreOS_Mantle_AMD64</upstreamProjects>
+      <threshold>
+        <name>UNSTABLE</name>
+        <ordinal>1</ordinal>
+        <color>YELLOW</color>
+        <completeBuild>true</completeBuild>
+      </threshold>
+    </jenkins.triggers.ReverseBuildTrigger>
+    <com.cloudbees.jenkins.GitHubPushTrigger plugin="github@1.19.2">
+      <spec></spec>
+    </com.cloudbees.jenkins.GitHubPushTrigger>
+  </triggers>
+  <concurrentBuild>false</concurrentBuild>
+  <builders>
+    <hudson.plugins.copyartifact.CopyArtifact plugin="copyartifact@1.38">
+      <project>Build_CoreOS_Mantle_AMD64</project>
+      <filter>bin/*, bin/*/*</filter>
+      <target>${WORKSPACE}</target>
+      <excludes></excludes>
+      <selector class="hudson.plugins.copyartifact.StatusBuildSelector"/>
+      <doNotFingerprintArtifacts>false</doNotFingerprintArtifacts>
+    </hudson.plugins.copyartifact.CopyArtifact>
+    <hudson.tasks.Shell>
+      <command>## show WORKSPACE
+echo &quot;WORKSPACE=&quot;$WORKSPACE
+
+## set environments
+export PATH=${WORKSPACE}/bin:$PATH
+export BOARD=&quot;amd64-usr&quot;
+
+## create a workspace for coreos SDK
+mkdir -p coreos
+cd coreos
+
+## download CoreOS SDK
+cork create --replace --sdk-version=${COREOS_SDK_VERSION}
+
+## build SDK packages
+cork enter -- ${SDK_SCRIPT_PATH}/build_packages --board=${BOARD}
+
+## build SDK images
+cork enter -- ${SDK_SCRIPT_PATH}/build_image --board=${BOARD} dev prod
+
+## build dev and prod QEMU images
+cork enter -- ${SDK_SCRIPT_PATH}/image_to_vm.sh --board=${BOARD}
+cork enter -- ${SDK_SCRIPT_PATH}/image_to_vm.sh --board=${BOARD} --prod_image
+
+## copy the new SDK images into the coreos_images directory
+sudo mkdir -p ../coreos_images
+sudo cp -rf src/build/images/${BOARD} ../coreos_images/
+#echo &quot;PWD=&quot;$PWD
+#ls -al
+#ls -al ../coreos_images
+
+# optionally you can run the kola tests on the built image
+cork enter -- sudo kola run -v --board=${BOARD} | true</command>
+    </hudson.tasks.Shell>
+  </builders>
+  <publishers>
+    <hudson.tasks.ArtifactArchiver>
+      <artifacts>coreos_images/*, coreos_images/*/*, coreos_images/*/*/*, coreos_images/*/*/*/*</artifacts>
+      <allowEmptyArchive>false</allowEmptyArchive>
+      <onlyIfSuccessful>true</onlyIfSuccessful>
+      <fingerprint>true</fingerprint>
+      <defaultExcludes>true</defaultExcludes>
+      <caseSensitive>false</caseSensitive>
+    </hudson.tasks.ArtifactArchiver>
+  </publishers>
+  <buildWrappers/>
+</project>

@@ -1,0 +1,133 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<project>
+  <actions/>
+  <description>This project uses Gimme to build go first then uses go to build etcd. </description>
+  <keepDependencies>false</keepDependencies>
+  <properties>
+    <jenkins.model.BuildDiscarderProperty>
+      <strategy class="hudson.tasks.LogRotator">
+        <daysToKeep>-1</daysToKeep>
+        <numToKeep>5</numToKeep>
+        <artifactDaysToKeep>-1</artifactDaysToKeep>
+        <artifactNumToKeep>-1</artifactNumToKeep>
+      </strategy>
+    </jenkins.model.BuildDiscarderProperty>
+    <com.coravy.hudson.plugins.github.GithubProjectProperty plugin="github@1.19.1">
+      <projectUrl>https://github.com/lupan2005/coreos--etcd/</projectUrl>
+      <displayName></displayName>
+    </com.coravy.hudson.plugins.github.GithubProjectProperty>
+    <com.sonyericsson.rebuild.RebuildSettings plugin="rebuild@1.25">
+      <autoRebuild>false</autoRebuild>
+      <rebuildDisabled>false</rebuildDisabled>
+    </com.sonyericsson.rebuild.RebuildSettings>
+    <com.synopsys.arc.jenkinsci.plugins.jobrestrictions.jobs.JobRestrictionProperty plugin="job-restrictions@0.4"/>
+    <hudson.model.ParametersDefinitionProperty>
+      <parameterDefinitions>
+        <org.jvnet.jenkins.plugins.nodelabelparameter.NodeParameterDefinition plugin="nodelabelparameter@1.7.2">
+          <name>OS1</name>
+          <description></description>
+          <allowedSlaves>
+            <string>ALL (no restriction)</string>
+          </allowedSlaves>
+          <defaultSlaves>
+            <string>openhuawei-os1</string>
+          </defaultSlaves>
+          <triggerIfResult>allowMultiSelectionForConcurrentBuilds</triggerIfResult>
+          <allowMultiNodeSelection>true</allowMultiNodeSelection>
+          <triggerConcurrentBuilds>true</triggerConcurrentBuilds>
+          <ignoreOfflineNodes>false</ignoreOfflineNodes>
+          <nodeEligibility class="org.jvnet.jenkins.plugins.nodelabelparameter.node.AllNodeEligibility"/>
+        </org.jvnet.jenkins.plugins.nodelabelparameter.NodeParameterDefinition>
+      </parameterDefinitions>
+    </hudson.model.ParametersDefinitionProperty>
+  </properties>
+  <scm class="hudson.plugins.git.GitSCM" plugin="git@2.4.4">
+    <configVersion>2</configVersion>
+    <userRemoteConfigs>
+      <hudson.plugins.git.UserRemoteConfig>
+        <url>https://github.com/lupan2005/coreos--etcd.git/</url>
+        <credentialsId>8755dc5b-0f9c-43d3-91d7-6c65bf6ed833</credentialsId>
+      </hudson.plugins.git.UserRemoteConfig>
+    </userRemoteConfigs>
+    <branches>
+      <hudson.plugins.git.BranchSpec>
+        <name>*/master</name>
+      </hudson.plugins.git.BranchSpec>
+    </branches>
+    <doGenerateSubmoduleConfigurations>false</doGenerateSubmoduleConfigurations>
+    <submoduleCfg class="list"/>
+    <extensions>
+      <hudson.plugins.git.extensions.impl.WipeWorkspace/>
+    </extensions>
+  </scm>
+  <canRoam>true</canRoam>
+  <disabled>false</disabled>
+  <blockBuildWhenDownstreamBuilding>false</blockBuildWhenDownstreamBuilding>
+  <blockBuildWhenUpstreamBuilding>false</blockBuildWhenUpstreamBuilding>
+  <triggers/>
+  <concurrentBuild>true</concurrentBuild>
+  <builders>
+    <hudson.tasks.Shell>
+      <command>## show JENKINS_HOME and WORKSPACE
+#echo &quot;JENKINS_HOME=&quot;$JENKINS_HOME
+echo &quot;WORKSPACE=&quot;$WORKSPACE
+echo &quot;PWD=&quot;$PWD
+
+## clean the old gimme script
+rm -f gimme
+
+## download GIMME script
+wget https://raw.githubusercontent.com/lupan2005/travis-ci-gimme/master/gimme
+
+## make GIMME executable
+#chmod +x $WORKSPACE/gimme
+chmod +x gimme
+
+## set environments
+export GOPATH=$WORKSPACE/gopath
+## needed for g1.5
+export GO15VENDOREXPERIMENT=&quot;1&quot;
+sed -i &quot;s/exit/#exit/g&quot; test
+GO_VERSIONS=&quot;1.6.2 1.5.3 1.5.2&quot;
+for v in $GO_VERSIONS ; do
+	## clean the old go builts
+	rm -rf $HOME/.gimme/versions/go$v.linux.amd64
+
+	## create a new go builts
+	#bash -x $WORKSPACE/gimme $v
+	./gimme $v
+
+	## refer $JENKINS_HOME/.gimme/envs/go$v.linux.amd64.env
+	export GOROOT=&quot;$HOME/.gimme/versions/go$v.linux.amd64&quot;
+	export PATH=&quot;$HOME/.gimme/versions/go$v.linux.amd64/bin&quot;:$PATH
+
+	echo &quot;PATH=&quot;$PATH
+
+	## check go version
+	go version
+
+	## set go environment
+	go env
+
+	## Download third party code
+	#go get -v github.com/chzchzchz/goword || true
+	go get -v honnef.co/go/simple/cmd/gosimple
+	go get -v honnef.co/go/unused/cmd/unused
+
+	## Run &quot;pushd cmd/ &amp;&amp; go get -t -v ./... &amp;&amp; popd&quot;
+	cd cmd
+	go get -t -v ./... || true
+	cd ..
+
+	## using go build
+	#strace go build
+
+	## using CoreOS Etcd test script
+	bash -x ./test
+done ;
+</command>
+    </hudson.tasks.Shell>
+  </builders>
+  <publishers/>
+  <buildWrappers/>
+</project>

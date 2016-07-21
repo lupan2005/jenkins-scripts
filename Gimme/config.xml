@@ -1,0 +1,112 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<project>
+  <actions/>
+  <description>This project tests the Gimme script by using Gimme to build go for different versions.</description>
+  <keepDependencies>false</keepDependencies>
+  <properties>
+    <jenkins.model.BuildDiscarderProperty>
+      <strategy class="hudson.tasks.LogRotator">
+        <daysToKeep>-1</daysToKeep>
+        <numToKeep>3</numToKeep>
+        <artifactDaysToKeep>-1</artifactDaysToKeep>
+        <artifactNumToKeep>-1</artifactNumToKeep>
+      </strategy>
+    </jenkins.model.BuildDiscarderProperty>
+    <com.sonyericsson.rebuild.RebuildSettings plugin="rebuild@1.25">
+      <autoRebuild>false</autoRebuild>
+      <rebuildDisabled>false</rebuildDisabled>
+    </com.sonyericsson.rebuild.RebuildSettings>
+    <com.synopsys.arc.jenkinsci.plugins.jobrestrictions.jobs.JobRestrictionProperty plugin="job-restrictions@0.4"/>
+    <hudson.model.ParametersDefinitionProperty>
+      <parameterDefinitions>
+        <org.jvnet.jenkins.plugins.nodelabelparameter.NodeParameterDefinition plugin="nodelabelparameter@1.7.2">
+          <name></name>
+          <description></description>
+          <allowedSlaves/>
+          <defaultSlaves>
+            <string>master</string>
+          </defaultSlaves>
+          <triggerIfResult>multiSelectionDisallowed</triggerIfResult>
+          <allowMultiNodeSelection>false</allowMultiNodeSelection>
+          <triggerConcurrentBuilds>false</triggerConcurrentBuilds>
+          <ignoreOfflineNodes>false</ignoreOfflineNodes>
+          <nodeEligibility class="org.jvnet.jenkins.plugins.nodelabelparameter.node.AllNodeEligibility"/>
+        </org.jvnet.jenkins.plugins.nodelabelparameter.NodeParameterDefinition>
+      </parameterDefinitions>
+    </hudson.model.ParametersDefinitionProperty>
+  </properties>
+  <scm class="hudson.scm.NullSCM"/>
+  <canRoam>true</canRoam>
+  <disabled>false</disabled>
+  <blockBuildWhenDownstreamBuilding>false</blockBuildWhenDownstreamBuilding>
+  <blockBuildWhenUpstreamBuilding>false</blockBuildWhenUpstreamBuilding>
+  <triggers>
+    <com.cloudbees.jenkins.GitHubPushTrigger plugin="github@1.19.1">
+      <spec></spec>
+    </com.cloudbees.jenkins.GitHubPushTrigger>
+  </triggers>
+  <concurrentBuild>false</concurrentBuild>
+  <builders>
+    <hudson.tasks.Shell>
+      <command>export UNAME=&quot;$(uname | tr &apos;[:upper:]&apos; &apos;[:lower:]&apos;)&quot;
+export GIMME_TMP=&quot;$WORKSPACE/tmp&quot;
+
+#echo &quot;UNAME=&quot;$UNAME
+#echo &quot;GO_VERSIONS=&quot;$GO_VERSIONS
+#echo &quot;GO_ARM_VERSIONS=&quot;$GO_ARM_VERSIONS
+#echo &quot;GO_BOOTSTRAP_VERSION=&quot;$GO_BOOTSTRAP_VERSION
+#echo &quot;GIMME_TMP=&quot;$GIMME_TMP
+
+mkdir -p &quot;${GIMME_TMP}&quot;
+
+## clean the old gimme script
+rm -f gimme
+
+## download GIMME script
+wget https://raw.githubusercontent.com/lupan2005/travis-ci-gimme/master/gimme
+
+## make GIMME executable
+#chmod +x $WORKSPACE/gimme
+chmod +x gimme
+
+## set environments
+##export GOPATH=$WORKSPACE/gopath
+## needed for g1.5
+export GO15VENDOREXPERIMENT=&quot;1&quot;
+
+./gimme -h
+./gimme -V
+
+## X86 tests
+GO_VERSIONS=&quot;1.4.1 1.5.3 1.6&quot;
+for v in $GO_VERSIONS ; do
+    echo &quot;---&gt; eval \&quot;\$(./gimme $v)\&quot;&quot; ;
+    (
+      eval &quot;$(bash -x ./gimme -f $v)&quot; || exit 1 ;
+##      [[ &quot;$(go env GOOS)&quot; = &quot;$(go env GOHOSTOS)&quot; &amp;&amp;
+##         &quot;$(go env GOARCH)&quot; = &quot;$(go env GOHOSTARCH)&quot; ]] ;
+##         &quot;$(go env GOARCH)&quot; == &quot;$(go env GOHOSTARCH)&quot; ]] || exit 1 ;
+    ) || exit 1 ;
+done ;
+
+## ARM64 tests
+GO_ARM_VERSIONS=&quot;1.5.3 1.6&quot;
+#for v in $GO_ARM_VERSIONS ; do
+#    echo &quot;---&gt; eval \&quot;\$(GIMME_ARCH=arm64 GIMME_TYPE=source ./gimme $v)\&quot;&quot; ;
+#    (
+#      eval &quot;$(GIMME_OS=linux GIMME_ARCH=arm64 GIMME_TYPE=source bash -x ./gimme -f $v)&quot; || exit 1 ;
+##      [[ &quot;$(go env GOOS)&quot; = &quot;linux&quot; &amp;&amp;
+##         &quot;$(go env GOARCH)&quot; = &quot;arm64&quot; ]] ;
+##         &quot;$(go env GOARCH)&quot; == &quot;arm64&quot; ]] || exit 1 ;
+#    ) || exit 1 ;
+#done ;
+
+bash -x ./gimme -l
+
+## remove gimme script
+rm -f gimme</command>
+    </hudson.tasks.Shell>
+  </builders>
+  <publishers/>
+  <buildWrappers/>
+</project>

@@ -1,0 +1,150 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<project>
+  <actions/>
+  <description>This project uses Gimme to build go first then uses go to build ignition.</description>
+  <keepDependencies>false</keepDependencies>
+  <properties>
+    <jenkins.model.BuildDiscarderProperty>
+      <strategy class="hudson.tasks.LogRotator">
+        <daysToKeep>-1</daysToKeep>
+        <numToKeep>5</numToKeep>
+        <artifactDaysToKeep>-1</artifactDaysToKeep>
+        <artifactNumToKeep>-1</artifactNumToKeep>
+      </strategy>
+    </jenkins.model.BuildDiscarderProperty>
+    <com.coravy.hudson.plugins.github.GithubProjectProperty plugin="github@1.19.0">
+      <projectUrl>https://github.com/lupan2005/coreos--ignition/</projectUrl>
+      <displayName></displayName>
+    </com.coravy.hudson.plugins.github.GithubProjectProperty>
+    <hudson.plugins.libvirt.BeforeJobSnapshotJobProperty plugin="libvirt-slave@1.8.5"/>
+    <hudson.model.ParametersDefinitionProperty>
+      <parameterDefinitions>
+        <org.jvnet.jenkins.plugins.nodelabelparameter.NodeParameterDefinition plugin="nodelabelparameter@1.7.2">
+          <name></name>
+          <description></description>
+          <allowedSlaves/>
+          <defaultSlaves>
+            <string>master</string>
+          </defaultSlaves>
+          <triggerIfResult>allCases</triggerIfResult>
+          <allowMultiNodeSelection>true</allowMultiNodeSelection>
+          <triggerConcurrentBuilds>false</triggerConcurrentBuilds>
+          <ignoreOfflineNodes>false</ignoreOfflineNodes>
+          <nodeEligibility class="org.jvnet.jenkins.plugins.nodelabelparameter.node.AllNodeEligibility"/>
+        </org.jvnet.jenkins.plugins.nodelabelparameter.NodeParameterDefinition>
+      </parameterDefinitions>
+    </hudson.model.ParametersDefinitionProperty>
+  </properties>
+  <scm class="hudson.plugins.git.GitSCM" plugin="git@2.4.4">
+    <configVersion>2</configVersion>
+    <userRemoteConfigs>
+      <hudson.plugins.git.UserRemoteConfig>
+        <url>https://github.com/lupan2005/coreos--ignition</url>
+      </hudson.plugins.git.UserRemoteConfig>
+    </userRemoteConfigs>
+    <branches>
+      <hudson.plugins.git.BranchSpec>
+        <name>*/master</name>
+      </hudson.plugins.git.BranchSpec>
+    </branches>
+    <doGenerateSubmoduleConfigurations>false</doGenerateSubmoduleConfigurations>
+    <submoduleCfg class="list"/>
+    <extensions>
+      <hudson.plugins.git.extensions.impl.WipeWorkspace/>
+    </extensions>
+  </scm>
+  <canRoam>true</canRoam>
+  <disabled>false</disabled>
+  <blockBuildWhenDownstreamBuilding>false</blockBuildWhenDownstreamBuilding>
+  <blockBuildWhenUpstreamBuilding>false</blockBuildWhenUpstreamBuilding>
+  <triggers/>
+  <concurrentBuild>false</concurrentBuild>
+  <builders>
+    <hudson.tasks.Shell>
+      <command>## show JENKINS_HOME and WORKSPACE
+echo &quot;JENKINS_HOME=&quot;$JENKINS_HOME
+echo &quot;WORKSPACE=&quot;$WORKSPACE
+
+## install gcc-aarch64-linux-gnu
+sudo apt-get update -qq
+sudo apt-get install -y -qq gcc-aarch64-linux-gnu
+
+aarch64-linux-gnu-gcc --version
+
+## clean the old gimme script
+rm -f gimme
+
+## download GIMME script
+wget https://raw.githubusercontent.com/lupan2005/travis-ci-gimme/master/gimme
+
+## make GIMME executable
+#chmod +x $WORKSPACE/gimme
+chmod +x gimme
+
+## set environments
+export GOPATH=$WORKSPACE/gopath
+## needed for g1.5
+export GO15VENDOREXPERIMENT=&quot;1&quot;
+
+GO_VERSIONS=&quot;1.6 1.5.3&quot;
+for v in $GO_VERSIONS ; do
+	## clean the old go builts
+	rm -rf $JENKINS_HOME/.gimme/versions/go$v.src
+
+	## create a new go builts
+	#bash -x $WORKSPACE/gimme $v
+    export GOGCCFLAGS=&quot;-fPIC -pthread -fmessage-length=0&quot;
+	CGO_ENABLED=1 GIMME_ARCH=arm64 GIMME_TYPE=source bash -x ./gimme -f $v
+
+	## refer $JENKINS_HOME/.gimme/envs/go$v.linux.amd64.env
+	export GOROOT=&quot;$JENKINS_HOME/.gimme/versions/go$v.src&quot;
+	export PATH=&quot;$JENKINS_HOME/.gimme/versions/go$v.src/bin&quot;:$PATH
+
+	echo &quot;PATH=&quot;$PATH
+
+	## check go version
+	go version
+
+	## set go environment
+	go env
+
+	## using CoreOS ignition test script
+    ##CGO_ENABLED=1 GOARCH=arm64 GOGCCFLAGS=&quot;-fPIC -pthread -fmessage-length=0&quot; bash -x ./test ##|| true
+    CGO_ENABLED=1 GOARCH=arm64 bash -x ./test
+##   	CGO_ENABLED=1 GIMME_ARCH=arm64 GOGCCFLAGS=&quot;-fPIC -pthread -fmessage-length=0&quot; bash -x ./build
+    ##NAME=&quot;ignition&quot;
+    ##ORG_PATH=&quot;github.com/coreos&quot;
+    ##REPO_PATH=&quot;${ORG_PATH}/${NAME}&quot;
+    ##VERSION=$(git describe --dirty)
+    ##GLDFLAGS=&quot;-X github.com/coreos/ignition/internal/version.Raw=${VERSION}&quot;
+
+    ##if [ ! -h gopath/src/${REPO_PATH} ]; then
+	##     mkdir -p gopath/src/${ORG_PATH}
+	##     ln -s ../../../.. gopath/src/${REPO_PATH} || exit 255
+    ##fi
+
+    ##export GOBIN=${PWD}/bin
+    ##export GOPATH=${PWD}/gopath
+    
+    ##export CGO_ENABLED=1
+    ##export GIMME_ARCH=arm64 
+#    unset GOGCCFLAGS
+    ##export GOARCH=arm64
+    ##export GOGCCFLAGS=&quot;-fPIC -pthread -fmessage-length=0&quot; 
+
+    ##go env
+    
+    ##export GOGCCFLAGS=&quot;-fPIC -pthread -fmessage-length=0&quot; 
+
+    ##echo &quot;Building ${NAME}...&quot;
+    ##go build -ldflags &quot;${GLDFLAGS}&quot; -o ${GOBIN}/${NAME} ${REPO_PATH}/internal
+done ;
+
+## uninstall gcc-aarch64-linux-gnu
+sudo apt-get remove -y -qq gcc-aarch64-linux-gnu
+</command>
+    </hudson.tasks.Shell>
+  </builders>
+  <publishers/>
+  <buildWrappers/>
+</project>

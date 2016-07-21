@@ -1,0 +1,95 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<project>
+  <actions/>
+  <description></description>
+  <keepDependencies>false</keepDependencies>
+  <properties>
+    <jenkins.model.BuildDiscarderProperty>
+      <strategy class="hudson.tasks.LogRotator">
+        <daysToKeep>30</daysToKeep>
+        <numToKeep>5</numToKeep>
+        <artifactDaysToKeep>-1</artifactDaysToKeep>
+        <artifactNumToKeep>-1</artifactNumToKeep>
+      </strategy>
+    </jenkins.model.BuildDiscarderProperty>
+    <com.sonyericsson.rebuild.RebuildSettings plugin="rebuild@1.25">
+      <autoRebuild>false</autoRebuild>
+      <rebuildDisabled>false</rebuildDisabled>
+    </com.sonyericsson.rebuild.RebuildSettings>
+    <com.synopsys.arc.jenkinsci.plugins.jobrestrictions.jobs.JobRestrictionProperty plugin="job-restrictions@0.4"/>
+    <hudson.model.ParametersDefinitionProperty>
+      <parameterDefinitions>
+        <hudson.model.ChoiceParameterDefinition>
+          <name>CONTAINER_NAME</name>
+          <description></description>
+          <choices class="java.util.Arrays$ArrayList">
+            <a class="string-array">
+              <string>amd64-trusty</string>
+              <string>amd64-wily</string>
+              <string>amd64-xenial</string>
+            </a>
+          </choices>
+        </hudson.model.ChoiceParameterDefinition>
+      </parameterDefinitions>
+    </hudson.model.ParametersDefinitionProperty>
+  </properties>
+  <scm class="hudson.scm.NullSCM"/>
+  <assignedNode>coreos</assignedNode>
+  <canRoam>false</canRoam>
+  <disabled>false</disabled>
+  <blockBuildWhenDownstreamBuilding>false</blockBuildWhenDownstreamBuilding>
+  <blockBuildWhenUpstreamBuilding>false</blockBuildWhenUpstreamBuilding>
+  <triggers>
+    <com.cloudbees.jenkins.GitHubPushTrigger plugin="github@1.19.2">
+      <spec></spec>
+    </com.cloudbees.jenkins.GitHubPushTrigger>
+  </triggers>
+  <concurrentBuild>false</concurrentBuild>
+  <builders>
+    <hudson.tasks.Shell>
+      <command>#!/bin/bash
+# delete the old rkt_test.sh
+rm -f rkt_test.sh
+# create a new rkt_test.sh
+cat &lt;&lt; EOF &gt; rkt_test.sh
+#!/bin/bash -x
+#
+# Rocket test
+#
+export GOPATH=&quot;\$PWD/gopath&quot;
+# pre-install
+apt-get update -qq
+apt-get install -y cpio realpath squashfs-tools
+apt-get install -y build-essential
+apt-get install -y libacl1-dev
+apt-get install -y libsystemd-dev libtiff
+apt-get install -y libsystemd-journal-dev
+apt-get install -y autoconf
+# clean the old rkt
+rm -rf rkt
+# Clone and test CoreOS Rkt
+git clone https://github.com/coreos/rkt.git
+# test rkt
+cd rkt
+go env
+# Configures rkt tests
+#wget https://raw.githubusercontent.com/coreos/rkt/master/autogen.sh
+./autogen.sh
+# Build host and fly to ensure we build stage1 init. We don&apos;t build everything
+# to avoid downloading large images.
+./configure --with-stage1-flavors=host,fly --enable-tpm=auto
+ls -al /usr/include/systemd/
+ls -al Makefile
+make unit-check
+EOF
+# make rkt_test.sh executable
+chmod a+x rkt_test.sh
+# run docker container to build and test the rkt
+sudo docker run --rm -t -v &quot;$PWD&quot;:/usr/src/myapp -w /usr/src/myapp quay.io/lupan2005/${CONTAINER_NAME} ./rkt_test.sh
+#echo &quot;PWD=&quot;$PWD
+#ls -al rkt</command>
+    </hudson.tasks.Shell>
+  </builders>
+  <publishers/>
+  <buildWrappers/>
+</project>

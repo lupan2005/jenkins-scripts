@@ -1,0 +1,116 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<project>
+  <actions/>
+  <description>This project uses kola to run Arm64 Qemu test.   This project is depended on project coreos--sdk_arm64_build.  So build coreos--sdk_arm64_build before build this project.</description>
+  <keepDependencies>false</keepDependencies>
+  <properties>
+    <jenkins.model.BuildDiscarderProperty>
+      <strategy class="hudson.tasks.LogRotator">
+        <daysToKeep>10</daysToKeep>
+        <numToKeep>5</numToKeep>
+        <artifactDaysToKeep>-1</artifactDaysToKeep>
+        <artifactNumToKeep>-1</artifactNumToKeep>
+      </strategy>
+    </jenkins.model.BuildDiscarderProperty>
+    <com.sonyericsson.rebuild.RebuildSettings plugin="rebuild@1.25">
+      <autoRebuild>false</autoRebuild>
+      <rebuildDisabled>false</rebuildDisabled>
+    </com.sonyericsson.rebuild.RebuildSettings>
+    <com.synopsys.arc.jenkinsci.plugins.jobrestrictions.jobs.JobRestrictionProperty plugin="job-restrictions@0.4"/>
+    <hudson.model.ParametersDefinitionProperty>
+      <parameterDefinitions>
+        <org.jvnet.jenkins.plugins.nodelabelparameter.NodeParameterDefinition plugin="nodelabelparameter@1.7.2">
+          <name></name>
+          <description></description>
+          <allowedSlaves>
+            <string>master</string>
+          </allowedSlaves>
+          <defaultSlaves>
+            <string>master</string>
+          </defaultSlaves>
+          <triggerIfResult>success</triggerIfResult>
+          <allowMultiNodeSelection>true</allowMultiNodeSelection>
+          <triggerConcurrentBuilds>false</triggerConcurrentBuilds>
+          <ignoreOfflineNodes>false</ignoreOfflineNodes>
+          <nodeEligibility class="org.jvnet.jenkins.plugins.nodelabelparameter.node.AllNodeEligibility"/>
+        </org.jvnet.jenkins.plugins.nodelabelparameter.NodeParameterDefinition>
+      </parameterDefinitions>
+    </hudson.model.ParametersDefinitionProperty>
+  </properties>
+  <scm class="hudson.scm.NullSCM"/>
+  <canRoam>true</canRoam>
+  <disabled>false</disabled>
+  <blockBuildWhenDownstreamBuilding>false</blockBuildWhenDownstreamBuilding>
+  <blockBuildWhenUpstreamBuilding>false</blockBuildWhenUpstreamBuilding>
+  <triggers>
+    <jenkins.triggers.ReverseBuildTrigger>
+      <spec></spec>
+      <upstreamProjects>Build_CoreOS_SDK_ARM64</upstreamProjects>
+      <threshold>
+        <name>SUCCESS</name>
+        <ordinal>0</ordinal>
+        <color>BLUE</color>
+        <completeBuild>true</completeBuild>
+      </threshold>
+    </jenkins.triggers.ReverseBuildTrigger>
+  </triggers>
+  <concurrentBuild>false</concurrentBuild>
+  <builders>
+    <hudson.plugins.copyartifact.CopyArtifact plugin="copyartifact@1.38">
+      <project>Build_CoreOS_Mantle_AMD64</project>
+      <filter>bin/*, bin/*/*</filter>
+      <target>${WORKSPACE}</target>
+      <excludes></excludes>
+      <selector class="hudson.plugins.copyartifact.StatusBuildSelector"/>
+      <doNotFingerprintArtifacts>false</doNotFingerprintArtifacts>
+    </hudson.plugins.copyartifact.CopyArtifact>
+    <hudson.plugins.copyartifact.CopyArtifact plugin="copyartifact@1.38">
+      <project>Build_CoreOS_SDK_ARM64</project>
+      <filter>coreos_images/*, coreos_images/*/*, coreos_images/*/*/*, coreos_images/*/*/*/*</filter>
+      <target>${WORKSPACE}</target>
+      <excludes></excludes>
+      <selector class="hudson.plugins.copyartifact.StatusBuildSelector"/>
+      <doNotFingerprintArtifacts>false</doNotFingerprintArtifacts>
+    </hudson.plugins.copyartifact.CopyArtifact>
+    <hudson.tasks.Shell>
+      <command>## show JENKINS_HOME and WORKSPACE
+##echo &quot;JENKINS_HOME=&quot;$JENKINS_HOME
+echo &quot;WORKSPACE=&quot;$WORKSPACE
+
+## set environments
+##export PATH=$JENKINS_HOME/bin:$PATH
+
+##kola --help
+
+##sudo apt-get update -qq
+##sudo apt-get install -y aptitude -qq
+##sudo aptitude install -y qemu
+
+##wget http://releases.linaro.org/components/kernel/uefi-linaro/latest/release/qemu64/QEMU_EFI.fd
+
+##wget http://cdimage.ubuntu.com/ubuntu-core/releases/14.04/release/ubuntu-core-14.04.4-core-arm64.tar.gz
+##tar -xzf ubuntu-core-14.04.4-core-arm64.tar.gz
+##COREOS_IAMGE=&quot;arm64_coreos_production_image_1010.0.0.2016-04-15-0851-a3.bin&quot;
+##wget https://github.com/glevand/hikey-coreos/releases/download/hikey-coreos-10/arm64_coreos_production_image_1010.0.0.2016-04-15-0851-a3.bin.xz
+##cat arm64_coreos_production_image_1010.0.0.2016-04-15-0851-a3.bin.xz | xz -d &gt; arm64_coreos_production_image_1010.0.0.2016-04-15-0851-a3.bin
+
+##qemu-system-aarch64 -machine virt -cpu cortex-a57 -machine type=virt -nographic -smp 1 -m 2048 -bios QEMU_EFI.fd -drive if=none,id=blk,file=arm64_coreos_production_image_1010.0.0.2016-04-15-0851-a3.bin,format=raw -device virtio-blk-device,drive=blk -device virtio-net-device,vlan=0 -redir tcp:10022::22
+
+##qemu-system-x86_64 -machine accel=kvm -cpu host -nographic -smp 1 -m 2048 -drive if=none,id=blk,file=coreos_developer_image.bin,format=raw -device virtio-blk-pci,drive=blk -device virtio-net,vlan=0 -net user,hostfwd=tcp::10022-:22
+
+BIOS_IMAGE=&quot;QEMU_EFI.fd&quot;
+COREOS_IMAGE=${WORKSPACE}&quot;/coreos_images/arm64-usr/latest/coreos_developer_image.bin&quot;
+BOARD=&quot;arm64-usr&quot;
+
+sudo rm -f $BIOS_IMAGE
+##sudo rm -f $COREOS_IMAGE
+wget http://releases.linaro.org/components/kernel/uefi-linaro/latest/release/qemu64/QEMU_EFI.fd
+##sudo kola qemu -v --qemu-bios $BIOS_IMAGE --qemu-image $COREOS_IMAGE --board $BOARD
+sudo ${WORKSPACE}/bin/kola qemu -v --qemu-bios $BIOS_IMAGE --board $BOARD --qemu-image $COREOS_IMAGE 
+##sudo rm -f $COREOS_IMAGE
+sudo rm -f $BIOS_IMAGE</command>
+    </hudson.tasks.Shell>
+  </builders>
+  <publishers/>
+  <buildWrappers/>
+</project>

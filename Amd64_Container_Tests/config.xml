@@ -1,0 +1,238 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<project>
+  <actions/>
+  <description></description>
+  <keepDependencies>false</keepDependencies>
+  <properties>
+    <jenkins.model.BuildDiscarderProperty>
+      <strategy class="hudson.tasks.LogRotator">
+        <daysToKeep>20</daysToKeep>
+        <numToKeep>5</numToKeep>
+        <artifactDaysToKeep>-1</artifactDaysToKeep>
+        <artifactNumToKeep>-1</artifactNumToKeep>
+      </strategy>
+    </jenkins.model.BuildDiscarderProperty>
+    <com.sonyericsson.rebuild.RebuildSettings plugin="rebuild@1.25">
+      <autoRebuild>false</autoRebuild>
+      <rebuildDisabled>false</rebuildDisabled>
+    </com.sonyericsson.rebuild.RebuildSettings>
+    <com.synopsys.arc.jenkinsci.plugins.jobrestrictions.jobs.JobRestrictionProperty plugin="job-restrictions@0.4"/>
+    <hudson.model.ParametersDefinitionProperty>
+      <parameterDefinitions>
+        <hudson.model.ChoiceParameterDefinition>
+          <name>CONTAINER_NAME</name>
+          <description></description>
+          <choices class="java.util.Arrays$ArrayList">
+            <a class="string-array">
+              <string>amd64-trusty</string>
+              <string>amd64-wily</string>
+              <string>amd64-xenial</string>
+            </a>
+          </choices>
+        </hudson.model.ChoiceParameterDefinition>
+        <hudson.model.ChoiceParameterDefinition>
+          <name>GOVERSION</name>
+          <description></description>
+          <choices class="java.util.Arrays$ArrayList">
+            <a class="string-array">
+              <string>1.5.3</string>
+              <string>1.6</string>
+              <string>1.6.2</string>
+            </a>
+          </choices>
+        </hudson.model.ChoiceParameterDefinition>
+        <hudson.model.StringParameterDefinition>
+          <name>USER_NAME</name>
+          <description></description>
+          <defaultValue>lupan2005</defaultValue>
+        </hudson.model.StringParameterDefinition>
+        <hudson.model.StringParameterDefinition>
+          <name>USER_EMAIL</name>
+          <description></description>
+          <defaultValue>lupan2005@gmail.com</defaultValue>
+        </hudson.model.StringParameterDefinition>
+        <hudson.model.StringParameterDefinition>
+          <name>COREOS_SDK_VERSION</name>
+          <description></description>
+          <defaultValue>master</defaultValue>
+        </hudson.model.StringParameterDefinition>
+        <hudson.model.StringParameterDefinition>
+          <name>SDK_SCRIPT_PATH</name>
+          <description></description>
+          <defaultValue>/mnt/host/source/src/scripts</defaultValue>
+        </hudson.model.StringParameterDefinition>
+        <hudson.model.StringParameterDefinition>
+          <name>BOARD</name>
+          <description></description>
+          <defaultValue>amd64-usr</defaultValue>
+        </hudson.model.StringParameterDefinition>
+      </parameterDefinitions>
+    </hudson.model.ParametersDefinitionProperty>
+  </properties>
+  <scm class="hudson.scm.NullSCM"/>
+  <assignedNode>coreos</assignedNode>
+  <canRoam>false</canRoam>
+  <disabled>false</disabled>
+  <blockBuildWhenDownstreamBuilding>false</blockBuildWhenDownstreamBuilding>
+  <blockBuildWhenUpstreamBuilding>false</blockBuildWhenUpstreamBuilding>
+  <triggers>
+    <hudson.triggers.TimerTrigger>
+      <spec>H H(0-7) 1-30 1-12 *</spec>
+    </hudson.triggers.TimerTrigger>
+  </triggers>
+  <concurrentBuild>false</concurrentBuild>
+  <builders>
+    <hudson.tasks.Shell>
+      <command>#!/bin/bash
+rm -f golang_build
+cat &lt;&lt; EOF &gt; golang_build
+#!/bin/bash
+#
+# golang build script
+#
+export GOROOT=\$PWD
+export GOROOT_BOOTSTRAP=/usr/local/go
+export CC_FOR_TARGET=gcc
+# Download golang source package
+rm -rf go
+wget https://storage.googleapis.com/golang/go\${1}.src.tar.gz
+tar -xzf go\${1}.src.tar.gz
+rm go\${1}.src.tar.gz
+go env
+cd go/src
+./make.bash
+EOF
+chmod a+x golang_build
+sudo rm -rf go${GOVERSION}
+docker run -t -v &quot;$PWD&quot;:/usr/src/myapp -w /usr/src/myapp quay.io/lupan2005/${CONTAINER_NAME} ./golang_build ${GOVERSION}
+sudo mv go go${GOVERSION}
+export GOROOT=$PWD/go${GOVERSION}
+export PATH=$PWD/go${GOVERSION}/bin:$PATH
+go version
+echo &quot;*** End of golang tests ***&quot;</command>
+    </hudson.tasks.Shell>
+    <hudson.tasks.Shell>
+      <command>#!/bin/bash
+rm -f mantle_test.sh
+cat &lt;&lt; EOF &gt; mantle_test.sh
+#!/bin/bash
+#
+# Mantle build and test
+#
+export GOPATH=&quot;\$PWD/gopath&quot;
+export GOROOT=\$PWD/go${GOVERSION}
+export PATH=\$PWD/go${GOVERSION}/bin:$PATH
+go version
+go env
+# Clone and build CoreOS Mantle
+rm -rf mantle
+git clone https://github.com/coreos/mantle.git
+cd mantle
+# Build mantle
+./build
+# Run tests
+bash -x ./test
+EOF
+chmod a+x mantle_test.sh
+docker run --rm -t -v &quot;$PWD&quot;:/usr/src/myapp -w /usr/src/myapp quay.io/lupan2005/${CONTAINER_NAME} ./mantle_test.sh
+export PATH=$PWD/mantle/bin:$PATH
+cork --help
+echo &quot;*** End of mantle tests ***&quot;</command>
+    </hudson.tasks.Shell>
+    <hudson.tasks.Shell>
+      <command>#!/bin/bash
+rm -f ignition_test.sh
+cat &lt;&lt; EOF &gt; ignition_test.sh
+#!/bin/bash
+#
+# Ignition build and test
+#
+export GOPATH=&quot;\$PWD/gopath&quot;
+export GOROOT=\$PWD/go${GOVERSION}
+export PATH=\$PWD/go${GOVERSION}/bin:$PATH
+go version
+go env
+# Clone and build CoreOS Ignition
+rm -rf ignition
+git clone https://github.com/coreos/ignition.git
+cd ignition
+go env
+#./build
+bash -x ./test
+EOF
+chmod a+x ignition_test.sh
+docker run --rm -t -v &quot;$PWD&quot;:/usr/src/myapp -w /usr/src/myapp quay.io/lupan2005/${CONTAINER_NAME} ./ignition_test.sh
+echo &quot;*** End of ignition tests ***&quot;
+</command>
+    </hudson.tasks.Shell>
+    <hudson.tasks.Shell>
+      <command>#!/bin/bash
+rm -f etcd_test.sh
+cat &lt;&lt; EOF &gt; etcd_test.sh
+#!/bin/bash
+#
+# ETCD build and test
+#
+export GOPATH=&quot;\$PWD/gopath&quot;
+export GOROOT=\$PWD/go${GOVERSION}
+export PATH=\$PWD/go${GOVERSION}/bin:$PATH
+go version
+go env
+# Clone and build CoreOS Etcd
+rm -rf etcd
+git clone https://github.com/coreos/etcd.git
+cd etcd
+## Download third party code
+#go get -v github.com/chzchzchz/goword || true
+go get -v honnef.co/go/simple/cmd/gosimple || true
+go get -v honnef.co/go/unused/cmd/unused || true
+cd cmd
+go get -t -v ./... || true
+cd ..
+#./build
+bash -x ./test || true
+EOF
+chmod a+x etcd_test.sh
+docker run --rm -t -v &quot;$PWD&quot;:/usr/src/myapp -w /usr/src/myapp quay.io/lupan2005/${CONTAINER_NAME} ./etcd_test.sh
+echo &quot;*** End of etcd tests ***&quot;
+</command>
+    </hudson.tasks.Shell>
+    <hudson.tasks.Shell>
+      <command>#!/bin/bash
+#
+# SDK build and test
+#
+export GOPATH=&quot;$PWD/gopath&quot;
+export GOROOT=$PWD/go${GOVERSION}
+export PATH=${GOROOT}/bin:$PATH
+export PATH=&quot;$PWD/mantle/bin:$PATH&quot;
+go version
+git config --global user.email ${USER_EMAIL}
+git config --global user.name ${USER_NAME}
+# Clone and build CoreOS SDK
+sudo rm -rf coreos
+mkdir coreos
+cd coreos
+## download CoreOS SDK
+cork create --replace --sdk-version=${COREOS_SDK_VERSION}
+## build CoreOS packages
+cork enter -- ${SDK_SCRIPT_PATH}/build_packages --board=${BOARD}
+## build CoreOS images
+cork enter -- ${SDK_SCRIPT_PATH}/build_image --board=${BOARD} dev prod
+
+#sudo mkdir -p $JENKINS_HOME/coreos_images
+#sudo cp -rf src/build/images/${BOARD} $JENKINS_HOME/coreos_images/
+
+## build dev and prod QEMU images
+cork enter -- ${SDK_SCRIPT_PATH}/image_to_vm.sh --board=${BOARD}
+#cork enter -- ${SDK_SCRIPT_PATH}/image_to_vm.sh --board=${BOARD} --prod_image
+
+# optionally you can run the kola tests on the built image
+cork enter -- sudo kola run -v --board=${BOARD} || true
+echo &quot;*** End of sdk tests ***&quot;
+</command>
+    </hudson.tasks.Shell>
+  </builders>
+  <publishers/>
+  <buildWrappers/>
+</project>

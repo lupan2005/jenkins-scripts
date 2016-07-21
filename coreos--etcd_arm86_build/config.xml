@@ -1,0 +1,121 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<project>
+  <actions/>
+  <description>This project uses Gimme to build go first then uses go to build etcd. </description>
+  <keepDependencies>false</keepDependencies>
+  <properties>
+    <jenkins.model.BuildDiscarderProperty>
+      <strategy class="hudson.tasks.LogRotator">
+        <daysToKeep>30</daysToKeep>
+        <numToKeep>5</numToKeep>
+        <artifactDaysToKeep>-1</artifactDaysToKeep>
+        <artifactNumToKeep>-1</artifactNumToKeep>
+      </strategy>
+    </jenkins.model.BuildDiscarderProperty>
+    <com.coravy.hudson.plugins.github.GithubProjectProperty plugin="github@1.19.2">
+      <projectUrl>https://github.com/lupan2005/coreos--etcd.git/</projectUrl>
+      <displayName></displayName>
+    </com.coravy.hudson.plugins.github.GithubProjectProperty>
+    <com.sonyericsson.rebuild.RebuildSettings plugin="rebuild@1.25">
+      <autoRebuild>false</autoRebuild>
+      <rebuildDisabled>false</rebuildDisabled>
+    </com.sonyericsson.rebuild.RebuildSettings>
+    <com.synopsys.arc.jenkinsci.plugins.jobrestrictions.jobs.JobRestrictionProperty plugin="job-restrictions@0.4"/>
+  </properties>
+  <scm class="hudson.plugins.git.GitSCM" plugin="git@2.5.0">
+    <configVersion>2</configVersion>
+    <userRemoteConfigs>
+      <hudson.plugins.git.UserRemoteConfig>
+        <url>https://github.com/lupan2005/coreos--etcd.git</url>
+        <credentialsId>8755dc5b-0f9c-43d3-91d7-6c65bf6ed833</credentialsId>
+      </hudson.plugins.git.UserRemoteConfig>
+    </userRemoteConfigs>
+    <branches>
+      <hudson.plugins.git.BranchSpec>
+        <name>*/master</name>
+      </hudson.plugins.git.BranchSpec>
+    </branches>
+    <doGenerateSubmoduleConfigurations>false</doGenerateSubmoduleConfigurations>
+    <submoduleCfg class="list"/>
+    <extensions>
+      <hudson.plugins.git.extensions.impl.WipeWorkspace/>
+    </extensions>
+  </scm>
+  <assignedNode>APM-ARM64</assignedNode>
+  <canRoam>false</canRoam>
+  <disabled>false</disabled>
+  <blockBuildWhenDownstreamBuilding>false</blockBuildWhenDownstreamBuilding>
+  <blockBuildWhenUpstreamBuilding>false</blockBuildWhenUpstreamBuilding>
+  <triggers>
+    <jenkins.triggers.ReverseBuildTrigger>
+      <spec></spec>
+      <upstreamProjects>Arm64-Golang-Tests</upstreamProjects>
+      <threshold>
+        <name>SUCCESS</name>
+        <ordinal>0</ordinal>
+        <color>BLUE</color>
+        <completeBuild>true</completeBuild>
+      </threshold>
+    </jenkins.triggers.ReverseBuildTrigger>
+  </triggers>
+  <concurrentBuild>false</concurrentBuild>
+  <builders>
+    <hudson.plugins.copyartifact.CopyArtifact plugin="copyartifact@1.38">
+      <project>Arm64-Golang-Tests</project>
+      <filter>go*/*, go*/*/*, go*/*/*/*, go*/*/*/*/*, go*/*/*/*/*/*, go*/*/*/*/*/*/*, go*/*/*/*/*/*/*/*, go*/*/*/*/*/*/*/*/*</filter>
+      <target>$WORKSPACE</target>
+      <excludes></excludes>
+      <selector class="hudson.plugins.copyartifact.StatusBuildSelector"/>
+      <doNotFingerprintArtifacts>false</doNotFingerprintArtifacts>
+    </hudson.plugins.copyartifact.CopyArtifact>
+    <hudson.tasks.Shell>
+      <command>#!/bin/bash -x
+## show WORKSPACE
+echo &quot;WORKSPACE=&quot;$WORKSPACE
+
+# workaround the bugs in test script for arm64 build
+sed -i &quot;s/exit/#exit/g&quot; test
+sed -i &quot;s/--race/ /&quot; test
+
+## set environments
+## needed for g1.5
+TARGET=&quot;arm64&quot;
+export GOPATH=&quot;$PWD/gopath&quot;
+export GO15VENDOREXPERIMENT=&quot;1&quot;
+#export CGO_ENABLED=1 
+#export ETCD_UNSUPPORTED_ARCH=$TARGET
+GO_VERSIONS=&quot;1.5.3 1.6.2&quot;
+for v in $GO_VERSIONS ; do
+	## set environments
+	export GOROOT=&quot;$WORKSPACE/go$v&quot;
+	export PATH=&quot;$WORKSPACE/go$v/bin&quot;:$PATH
+	#echo &quot;PATH=&quot;$PATH
+    chmod -R a+x $WORKSPACE/go$v/*
+    
+	## check go version
+	go version
+
+	## set go environment
+	go env
+
+	## Download third party code
+	#go get -v github.com/chzchzchz/goword || true
+	go get -v honnef.co/go/simple/cmd/gosimple || true
+	go get -v honnef.co/go/unused/cmd/unused || true
+
+	## Run &quot;pushd cmd/ &amp;&amp; go get -t -v ./... &amp;&amp; popd&quot;
+	cd cmd
+	go get -t -v ./... || true
+	cd ..
+
+	## using CoreOS Etcd test script
+	#GOARCH=$TARGET bash -x ./build
+    GOARCH=$TARGET ETCD_UNSUPPORTED_ARCH=$TARGET CGO_ENABLED=1 bash -x ./build
+    ##GOARCH=$TARGET ETCD_UNSUPPORTED_ARCH=$TARGET bash -x ./test || true
+    #GOARCH=$TARGET bash -x ./test || true
+done ;</command>
+    </hudson.tasks.Shell>
+  </builders>
+  <publishers/>
+  <buildWrappers/>
+</project>

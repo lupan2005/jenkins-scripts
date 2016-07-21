@@ -1,0 +1,104 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<project>
+  <actions/>
+  <description></description>
+  <keepDependencies>false</keepDependencies>
+  <properties>
+    <jenkins.model.BuildDiscarderProperty>
+      <strategy class="hudson.tasks.LogRotator">
+        <daysToKeep>30</daysToKeep>
+        <numToKeep>5</numToKeep>
+        <artifactDaysToKeep>-1</artifactDaysToKeep>
+        <artifactNumToKeep>-1</artifactNumToKeep>
+      </strategy>
+    </jenkins.model.BuildDiscarderProperty>
+    <com.sonyericsson.rebuild.RebuildSettings plugin="rebuild@1.25">
+      <autoRebuild>false</autoRebuild>
+      <rebuildDisabled>false</rebuildDisabled>
+    </com.sonyericsson.rebuild.RebuildSettings>
+    <com.synopsys.arc.jenkinsci.plugins.jobrestrictions.jobs.JobRestrictionProperty plugin="job-restrictions@0.4"/>
+    <hudson.model.ParametersDefinitionProperty>
+      <parameterDefinitions>
+        <hudson.model.ChoiceParameterDefinition>
+          <name>CONTAINER_NAME</name>
+          <description></description>
+          <choices class="java.util.Arrays$ArrayList">
+            <a class="string-array">
+              <string>arm64-trusty</string>
+              <string>arm64-wily</string>
+              <string>arm64-xenial</string>
+            </a>
+          </choices>
+        </hudson.model.ChoiceParameterDefinition>
+      </parameterDefinitions>
+    </hudson.model.ParametersDefinitionProperty>
+  </properties>
+  <scm class="hudson.scm.NullSCM"/>
+  <assignedNode>APM-ARM64</assignedNode>
+  <canRoam>false</canRoam>
+  <disabled>false</disabled>
+  <blockBuildWhenDownstreamBuilding>false</blockBuildWhenDownstreamBuilding>
+  <blockBuildWhenUpstreamBuilding>false</blockBuildWhenUpstreamBuilding>
+  <triggers>
+    <com.cloudbees.jenkins.GitHubPushTrigger plugin="github@1.19.2">
+      <spec></spec>
+    </com.cloudbees.jenkins.GitHubPushTrigger>
+    <hudson.triggers.SCMTrigger>
+      <spec>H/5 * * * *</spec>
+      <ignorePostCommitHooks>false</ignorePostCommitHooks>
+    </hudson.triggers.SCMTrigger>
+  </triggers>
+  <concurrentBuild>false</concurrentBuild>
+  <builders>
+    <hudson.tasks.Shell>
+      <command>#!/bin/bash
+rm -f etcd_build.sh
+cat &lt;&lt; EOF &gt; etcd_build.sh
+#!/bin/bash
+#
+# ETCD build
+#
+export GOPATH=\$PWD/gopath
+# Clone and build CoreOS Etcd
+rm -rf etcd
+git clone https://github.com/coreos/etcd.git
+#git clone https://github.com/lupan2005/coreos--etcd.git
+cd etcd
+go env
+cd cmd
+go get -t -v ./... || true
+cd ..
+./build
+EOF
+chmod a+x etcd_build.sh
+docker run --rm -t -v &quot;$PWD&quot;:/usr/src/myapp -w /usr/src/myapp quay.io/lupan2005/${CONTAINER_NAME} ./etcd_build.sh</command>
+    </hudson.tasks.Shell>
+    <hudson.tasks.Shell>
+      <command>#!/bin/bash
+rm -f etcd_test.sh
+cat &lt;&lt; EOF &gt; etcd_test.sh
+#!/bin/bash
+#
+# ETCD build and test
+#
+export GOPATH=\$PWD/gopath
+# Clone and build CoreOS Etcd
+rm -rf coreos--etcd
+git clone https://github.com/coreos/etcd.git
+#git clone https://github.com/lupan2005/coreos--etcd.git
+cd coreos--etcd
+go env
+cd cmd
+go get -t -v ./... || true
+cd ..
+sed -i &quot;s/exit/#exit/g&quot; test
+sed -i &quot;s/--race/ /&quot; test
+bash -x ./test || true
+EOF
+chmod a+x etcd_test.sh
+docker run --rm -t -v &quot;$PWD&quot;:/usr/src/myapp -w /usr/src/myapp quay.io/lupan2005/${CONTAINER_NAME} ./etcd_test.sh</command>
+    </hudson.tasks.Shell>
+  </builders>
+  <publishers/>
+  <buildWrappers/>
+</project>

@@ -1,0 +1,137 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<project>
+  <actions/>
+  <description></description>
+  <keepDependencies>false</keepDependencies>
+  <properties>
+    <jenkins.model.BuildDiscarderProperty>
+      <strategy class="hudson.tasks.LogRotator">
+        <daysToKeep>10</daysToKeep>
+        <numToKeep>5</numToKeep>
+        <artifactDaysToKeep>-1</artifactDaysToKeep>
+        <artifactNumToKeep>-1</artifactNumToKeep>
+      </strategy>
+    </jenkins.model.BuildDiscarderProperty>
+    <hudson.plugins.copyartifact.CopyArtifactPermissionProperty plugin="copyartifact@1.38">
+      <projectNameList>
+        <string>*</string>
+      </projectNameList>
+    </hudson.plugins.copyartifact.CopyArtifactPermissionProperty>
+    <com.sonyericsson.rebuild.RebuildSettings plugin="rebuild@1.25">
+      <autoRebuild>false</autoRebuild>
+      <rebuildDisabled>false</rebuildDisabled>
+    </com.sonyericsson.rebuild.RebuildSettings>
+    <com.synopsys.arc.jenkinsci.plugins.jobrestrictions.jobs.JobRestrictionProperty plugin="job-restrictions@0.4"/>
+    <hudson.model.ParametersDefinitionProperty>
+      <parameterDefinitions>
+        <hudson.model.ChoiceParameterDefinition>
+          <name>CONTAINER_NAME</name>
+          <description></description>
+          <choices class="java.util.Arrays$ArrayList">
+            <a class="string-array">
+              <string>arm64-trusty</string>
+              <string>arm64-wily</string>
+              <string>arm64-xenial</string>
+            </a>
+          </choices>
+        </hudson.model.ChoiceParameterDefinition>
+      </parameterDefinitions>
+    </hudson.model.ParametersDefinitionProperty>
+  </properties>
+  <scm class="hudson.scm.NullSCM"/>
+  <assignedNode>APM-ARM64</assignedNode>
+  <canRoam>false</canRoam>
+  <disabled>false</disabled>
+  <blockBuildWhenDownstreamBuilding>false</blockBuildWhenDownstreamBuilding>
+  <blockBuildWhenUpstreamBuilding>false</blockBuildWhenUpstreamBuilding>
+  <triggers>
+    <com.cloudbees.jenkins.GitHubPushTrigger plugin="github@1.19.2">
+      <spec></spec>
+    </com.cloudbees.jenkins.GitHubPushTrigger>
+  </triggers>
+  <concurrentBuild>false</concurrentBuild>
+  <builders>
+    <hudson.tasks.Shell>
+      <command>#!/bin/bash
+# delete the old golang_build script
+rm -f golang_build
+# generate a new golang_build script
+cat &lt;&lt; EOF1 &gt; golang_build
+#!/bin/bash
+#
+# arm64 golang build script
+#
+export GOROOT=\$PWD
+export GOROOT_BOOTSTRAP=/usr/local/go
+export CC_FOR_TARGET=gcc
+# Download golang source package
+rm -rf go
+wget https://storage.googleapis.com/golang/go\${1}.src.tar.gz
+tar -xzf go\${1}.src.tar.gz
+rm go\${1}.src.tar.gz
+# Build the golang
+go env
+cd go/src
+./make.bash
+EOF1
+# make golang_build executable
+chmod a+x golang_build
+# delete the old golang script
+rm -f golang
+# generate a new golang script
+cat &lt;&lt; EOF2 &gt; golang
+#!/bin/bash
+# clean the old golang
+sudo rm -rf go\${1}
+# run docker comtainer to build the golang
+docker run -t -v &quot;\$PWD&quot;:/usr/src/myapp -w /usr/src/myapp quay.io/lupan2005/\${CONTAINER_NAME} ./golang_build \${1}
+# change the ownership of go from root to core
+sudo chown -R core:core go
+# rename go to go\${1}
+mv go  go\${1}
+# set GOROOT
+#echo &quot;PWD=&quot;$PWD
+#export GOROOT=\$PWD
+#echo &quot;GOROOT=&quot;$GOROOT
+# clean docker containers
+paramnum=\$(docker ps -a | awk &apos;{print \$1}&apos;);
+for id in \$paramnum 
+do
+  if [[ &quot;\$id&quot; != &quot;CONTAINER&quot; ]]; then
+     echo &quot;delete docker container: \$id&quot;
+     echo `docker rm -f \$id`
+  fi
+done
+#echo &quot;*** End of golang script ***&quot;
+EOF2
+# make golang executable
+chmod a+x golang
+</command>
+    </hudson.tasks.Shell>
+    <hudson.tasks.Shell>
+      <command>#echo &quot;PWD0=&quot;$PWD
+# build go1.5.3
+./golang 1.5.3
+# test go1.5.3
+export GOROOT=$PWD/go1.5.3
+go1.5.3/bin/go version
+# build go1.6.2
+./golang 1.6.2
+# test go1.6.2
+export GOROOT=$PWD/go1.6.2
+go1.6.2/bin/go version
+</command>
+    </hudson.tasks.Shell>
+  </builders>
+  <publishers>
+    <hudson.tasks.ArtifactArchiver>
+      <artifacts>go*/*, go*/*/*, go*/*/*/*, go*/*/*/*/*, go*/*/*/*/*/*, go*/*/*/*/*/*/*, go*/*/*/*/*/*/*/*, go*/*/*/*/*/*/*/*/*</artifacts>
+      <allowEmptyArchive>false</allowEmptyArchive>
+      <onlyIfSuccessful>true</onlyIfSuccessful>
+      <fingerprint>true</fingerprint>
+      <defaultExcludes>true</defaultExcludes>
+      <caseSensitive>false</caseSensitive>
+    </hudson.tasks.ArtifactArchiver>
+  </publishers>
+  <buildWrappers/>
+</project>

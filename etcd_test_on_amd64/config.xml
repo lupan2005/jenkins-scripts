@@ -1,0 +1,82 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<project>
+  <actions/>
+  <description></description>
+  <keepDependencies>false</keepDependencies>
+  <properties>
+    <jenkins.model.BuildDiscarderProperty>
+      <strategy class="hudson.tasks.LogRotator">
+        <daysToKeep>30</daysToKeep>
+        <numToKeep>5</numToKeep>
+        <artifactDaysToKeep>-1</artifactDaysToKeep>
+        <artifactNumToKeep>-1</artifactNumToKeep>
+      </strategy>
+    </jenkins.model.BuildDiscarderProperty>
+    <com.sonyericsson.rebuild.RebuildSettings plugin="rebuild@1.25">
+      <autoRebuild>false</autoRebuild>
+      <rebuildDisabled>false</rebuildDisabled>
+    </com.sonyericsson.rebuild.RebuildSettings>
+    <com.synopsys.arc.jenkinsci.plugins.jobrestrictions.jobs.JobRestrictionProperty plugin="job-restrictions@0.4"/>
+    <hudson.model.ParametersDefinitionProperty>
+      <parameterDefinitions>
+        <hudson.model.StringParameterDefinition>
+          <name>GOVERSION</name>
+          <description></description>
+          <defaultValue>1.5.3</defaultValue>
+        </hudson.model.StringParameterDefinition>
+      </parameterDefinitions>
+    </hudson.model.ParametersDefinitionProperty>
+  </properties>
+  <scm class="hudson.scm.NullSCM"/>
+  <assignedNode>openhuawei-os1</assignedNode>
+  <canRoam>false</canRoam>
+  <disabled>false</disabled>
+  <blockBuildWhenDownstreamBuilding>false</blockBuildWhenDownstreamBuilding>
+  <blockBuildWhenUpstreamBuilding>false</blockBuildWhenUpstreamBuilding>
+  <triggers>
+    <com.cloudbees.jenkins.GitHubPushTrigger plugin="github@1.19.2">
+      <spec></spec>
+    </com.cloudbees.jenkins.GitHubPushTrigger>
+  </triggers>
+  <concurrentBuild>false</concurrentBuild>
+  <builders>
+    <hudson.tasks.Shell>
+      <command>## create the JENKINS_HOME
+sudo mkdir -p $JENKINS_HOME
+## clean up
+sudo rm -rf $JENKINS_HOME/go
+
+## install go binary
+sudo curl -O https://storage.googleapis.com/golang/go$GOVERSION.linux-amd64.tar.gz
+sudo tar -xzf go$GOVERSION.linux-amd64.tar.gz -C $JENKINS_HOME
+sudo rm go$GOVERSION.linux-amd64.tar.gz
+
+## set environments
+export PATH=$JENKINS_HOME/go/bin:$PATH
+export GOROOT=$JENKINS_HOME/go
+export GOPATH=$WORKSPACE/gopath
+export GO15VENDOREXPERIMENT=&quot;1&quot;
+
+go version
+go env
+sudo rm -rf etcd
+git clone https://github.com/coreos/etcd.git
+cd etcd
+
+## Download third party code
+#go get -v github.com/chzchzchz/goword || true
+#go get -v honnef.co/go/simple/cmd/gosimple || true
+#go get -v honnef.co/go/unused/cmd/unused || true
+
+## Run &quot;pushd cmd/ &amp;&amp; go get -t -v ./... &amp;&amp; popd&quot;
+cd cmd
+go get -t -v ./... || true
+cd ..
+
+## Run etcd test
+bash -x ./test || true</command>
+    </hudson.tasks.Shell>
+  </builders>
+  <publishers/>
+  <buildWrappers/>
+</project>

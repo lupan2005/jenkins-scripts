@@ -1,0 +1,97 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<project>
+  <actions/>
+  <description></description>
+  <keepDependencies>false</keepDependencies>
+  <properties>
+    <jenkins.model.BuildDiscarderProperty>
+      <strategy class="hudson.tasks.LogRotator">
+        <daysToKeep>-1</daysToKeep>
+        <numToKeep>5</numToKeep>
+        <artifactDaysToKeep>-1</artifactDaysToKeep>
+        <artifactNumToKeep>-1</artifactNumToKeep>
+      </strategy>
+    </jenkins.model.BuildDiscarderProperty>
+    <com.sonyericsson.rebuild.RebuildSettings plugin="rebuild@1.25">
+      <autoRebuild>false</autoRebuild>
+      <rebuildDisabled>false</rebuildDisabled>
+    </com.sonyericsson.rebuild.RebuildSettings>
+    <com.synopsys.arc.jenkinsci.plugins.jobrestrictions.jobs.JobRestrictionProperty plugin="job-restrictions@0.4"/>
+    <hudson.model.ParametersDefinitionProperty>
+      <parameterDefinitions>
+        <hudson.model.StringParameterDefinition>
+          <name>GOVERSION</name>
+          <description></description>
+          <defaultValue>1.5.2</defaultValue>
+        </hudson.model.StringParameterDefinition>
+      </parameterDefinitions>
+    </hudson.model.ParametersDefinitionProperty>
+  </properties>
+  <scm class="hudson.scm.NullSCM"/>
+  <assignedNode>APM-ARM64</assignedNode>
+  <canRoam>false</canRoam>
+  <disabled>false</disabled>
+  <blockBuildWhenDownstreamBuilding>false</blockBuildWhenDownstreamBuilding>
+  <blockBuildWhenUpstreamBuilding>false</blockBuildWhenUpstreamBuilding>
+  <triggers/>
+  <concurrentBuild>false</concurrentBuild>
+  <builders>
+    <hudson.tasks.Shell>
+      <command>## create the JENKINS_HOME
+sudo mkdir -p $JENKINS_HOME
+#sudo chown -R jenkins:jenkins $JENKINS_HOME
+
+## clean up
+sudo rm -rf $JENKINS_HOME/go
+
+## install go binary
+#wget https://github.com/hypriot/golang-armbuilds/releases/download/v$GOVERSION/go$GOVERSION.linux-arm64.tar.gz
+#curl -O https://github.com/hypriot/golang-armbuilds/releases/download/v$GOVERSION/go$GOVERSION.linux-arm64.tar.gz
+wget https://github.com/hypriot/golang-armbuilds/releases/download/v1.5.2/go1.5.2.linux-arm64.tar.gz
+#ls -al
+tar xzf go1.5.2.linux-arm64.tar.gz -C /var/lib/jenkins
+#tar xf go$GOVERSION.linux-arm64.tar.gz -C $JENKINS_HOME
+#tar -xzf go$GOVERSION.linux-arm64.tar.gz -C $JENKINS_HOME
+rm go1.5.2.linux-arm64.tar.gz
+#rm go$GOVERSION.linux-arm64.tar.gz
+
+## clone CoreOS etcd source
+#git clone https://github.com/lupan2005/coreos--etcd.git
+#cd $WORKSPACE/coreos--etcd/
+
+## set environments
+export PATH=$JENKINS_HOME/go/bin:$PATH
+export GOROOT=$JENKINS_HOME/go
+export GOPATH=$WORKSPACE/gopath
+export GO15VENDOREXPERIMENT=&quot;1&quot;
+export GOARCH=&quot;arm64&quot;
+export CGO_ENABLED=1
+
+go version
+go env
+sudo rm -rf etcd
+git clone https://github.com/coreos/etcd.git
+cd etcd
+
+## Download third party code
+#go get -v github.com/chzchzchz/goword || true
+#go get -v honnef.co/go/simple/cmd/gosimple || true
+#go get -v honnef.co/go/unused/cmd/unused || true
+
+## Run &quot;pushd cmd/ &amp;&amp; go get -t -v ./... &amp;&amp; popd&quot;
+cd cmd
+go get -t -v ./... || true
+cd ..
+
+## fix test for ARM64
+#sed -i &quot;s/exit/#exit/g&quot; test
+sed -i &quot;s/--race/ /&quot; test
+
+## Run etcd test
+bash -x ./test || true
+</command>
+    </hudson.tasks.Shell>
+  </builders>
+  <publishers/>
+  <buildWrappers/>
+</project>

@@ -1,0 +1,70 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<project>
+  <actions/>
+  <description></description>
+  <keepDependencies>false</keepDependencies>
+  <properties>
+    <jenkins.model.BuildDiscarderProperty>
+      <strategy class="hudson.tasks.LogRotator">
+        <daysToKeep>30</daysToKeep>
+        <numToKeep>5</numToKeep>
+        <artifactDaysToKeep>-1</artifactDaysToKeep>
+        <artifactNumToKeep>-1</artifactNumToKeep>
+      </strategy>
+    </jenkins.model.BuildDiscarderProperty>
+    <com.sonyericsson.rebuild.RebuildSettings plugin="rebuild@1.25">
+      <autoRebuild>false</autoRebuild>
+      <rebuildDisabled>false</rebuildDisabled>
+    </com.sonyericsson.rebuild.RebuildSettings>
+    <com.synopsys.arc.jenkinsci.plugins.jobrestrictions.jobs.JobRestrictionProperty plugin="job-restrictions@0.4"/>
+  </properties>
+  <scm class="hudson.scm.NullSCM"/>
+  <assignedNode>APM-ARM64</assignedNode>
+  <canRoam>false</canRoam>
+  <disabled>false</disabled>
+  <blockBuildWhenDownstreamBuilding>false</blockBuildWhenDownstreamBuilding>
+  <blockBuildWhenUpstreamBuilding>false</blockBuildWhenUpstreamBuilding>
+  <triggers/>
+  <concurrentBuild>false</concurrentBuild>
+  <builders>
+    <hudson.tasks.Shell>
+      <command>rm -f mantle_test.sh
+cat &lt;&lt; EOF &gt; mantle_test.sh
+#!/bin/bash -x
+#
+# Mantle build and test
+#
+#OUTPUT=$PWD/bin
+#mkdir -p bin
+#ls -al ${OUTPUT}
+# Clone and build CoreOS Mantle
+rm -rf mantle
+git clone https://github.com/coreos/mantle.git
+cd mantle
+export GOPATH=&quot;$PWD/gopath&quot;
+go env
+#./build
+#cp -rf bin ../
+#cp -f bin/* $OUTPUT
+#cp -f bin/arm64/kolet $OUTPUT
+#ls -al /usr/local/go/bin
+#cp /usr/local/go/bin/* $OUTPUT
+#ls -al $OUTPUT
+bash -x ./test
+#cp -rf bin ../
+#cd ..
+##rm -rf mantle
+EOF
+chmod a+x mantle_test.sh
+docker run --rm -t -v &quot;$PWD&quot;:/usr/src/myapp -w /usr/src/myapp quay.io/lupan2005/arm64-trusty ./mantle_test.sh
+#mkdir -p bin
+#mv mantle/bin .
+#cp -f bin/arm64/kolet $OUTPUT
+#ls -al /usr/local/go/bin
+#cp /usr/local/go/bin/* $OUTPUT
+#ls -al bin</command>
+    </hudson.tasks.Shell>
+  </builders>
+  <publishers/>
+  <buildWrappers/>
+</project>
